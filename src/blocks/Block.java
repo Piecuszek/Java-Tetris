@@ -1,6 +1,6 @@
-package objects;
+package blocks;
 
-import objects.enums.Rotation;
+import enums.Rotation;
 
 import java.awt.*;
 
@@ -31,8 +31,8 @@ public class Block {
         this.color = java.awt.Color.WHITE;
     }
 
-    public void rotate(int next) {
-        rotation = Rotation.values()[(int) ((Rotation.values().length + next) % Rotation.values().length)];
+    public void rotate() {
+        rotation = Rotation.values()[(int) ((rotation.ordinal() + 1) % Rotation.values().length)];
     }
 
     public void show(int number) {

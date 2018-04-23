@@ -1,46 +1,36 @@
-import objects.Block;
-import objects.blocks.*;
-import objects.enums.Movements;
-import objects.enums.Rotation;
+import blocks.Block;
+import blocks.*;
+import enums.Movements;
+import enums.Rotation;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Random;
 
-public class Game {
+public class Game extends JPanel {
     protected int x, y;
     protected Color[][] board;
     protected long score;
-    protected ArrayList<Block> list;
-
     protected Block current;
     protected int nextBlock;
     private JPanel panel1;
+    boolean stop;
 
     public Game() {
     }
 
     public void init() {
+        stop = false;
         x = 12;
         y = 20;
         int startPosition = x / 2 - 2;
-
-        // dodanie wszystkich rodzajów klocków do listy
-        list.add(new IBlock(startPosition, 0));
-        list.add(new JBlock(startPosition, 0));
-        list.add(new LBlock(startPosition, 0));
-        list.add(new TBlock(startPosition, 0));
-        list.add(new SBlock(startPosition, 0));
-        list.add(new ZBlock(startPosition, 0));
-        list.add(new OBlock(startPosition, 0));
 
         // stworzenie planszy
         board = new Color[y][x];
         for (int i = 0; i < y; i++) {
             for (int j = 0; j < x; j++) {
-                if (i == 0 || i == (y - 1) || j == (x - 1)) {
+                if (j == 0 || i == (y - 1) || j == (x - 1)) {
                     board[i][j] = Color.BLACK;
                 } else {
                     board[i][j] = Color.GRAY;
@@ -50,7 +40,7 @@ public class Game {
 
         Random random = new Random();
         nextBlock = random.nextInt(7);
-        current = list.get(random.nextInt(7));
+        generateNextBlock();
     }
 
     protected boolean isFullRow(int index) {
@@ -85,84 +75,151 @@ public class Game {
         // zwiększenie wyniku
         switch (clears) {
             case 1:
-                score += 100;
+                score += 50;
                 break;
             case 2:
-                score += 300;
+                score += 150;
                 break;
             case 3:
-                score += 600;
+                score += 300;
                 break;
             case 4:
-                score += 1000;
+                score += 500;
                 break;
         }
     }
 
-    protected boolean canBeMoved(Block temp) {
+    protected boolean canBeMoved() {
         // sprawdzenie czy możliwe jest umieszczenie klocka w obecnej pozycji na planszy
-        for (Point[] p : temp.getStructure()) {
-            if ( board[temp.getY() + p[temp.getRotation()].y]
-                    [temp.getX() + p[temp.getRotation()].x] != Color.GRAY){
+        for (Point p : current.getStructure()[current.getRotation()]) {
+            if ((current.getY() + p.y) >= (y - 1) || (current.getX() + p.x) >= (x - 1) || (current.getX() + p.x <= 0)) {
+                // wyjście poza zakres
+                return false;
+            }
+
+            if (board[current.getY() + p.y]
+                    [current.getX() + p.x] != Color.GRAY) {
                 return false;
             }
         }
         return true;
     }
 
-    protected void move(Movements movements) {
+    public void move(Movements movements) {
         // ruch klocka
-        Block temp = current;
+        int t_x = current.getX();
+        int t_y = current.getY();
+        int t_r = current.getRotation();
 
-        switch (movements){
+        switch (movements) {
             case MOVE_DOWN: // w dół
-                temp.setY(temp.getY() + 1);
+                if (current.getY() == y - 2) {
+                    fixBoard();
+                    break;
+                } else {
+                    current.setY(current.getY() + 1);
+                    if (!canBeMoved()) {
+                        current.setY(t_y);
+                        fixBoard();
+                    }
+                }
                 break;
             case MOVE_LEFT: // w lewo
-                temp.setX(temp.getX() - 1);
+                if (current.getX() == 1) {
+                    return;
+                } else {
+                    current.setX(current.getX() - 1);
+                    if (!canBeMoved()) {
+                        current.setX(t_x);
+                    }
+                }
                 break;
             case MOVE_RIGHT: // w prawo
-                temp.setX(temp.getX() + 1);
+                if (current.getX() == x - 2) {
+                    return;
+                } else {
+                    current.setX(current.getX() + 1);
+                    if (!canBeMoved()) {
+                        current.setX(t_x);
+                    }
+                }
                 break;
-            case TURN_LEFT: // obrót w lewo
-                temp.rotate(-1);
+            case ROTATE: // obrót
+                current.rotate();
+                if (!canBeMoved()) {
+                    current.setRotation(t_r);
+                }
                 break;
-            case TURN_RIGHT: //obrót w prawo
-                temp.rotate(1);
-                break;
-        }
-
-        if (canBeMoved(temp)) {
-            current = temp;
         }
     }
 
-    protected boolean isDropped(int index) {
-        for (Point[] p : current.getStructure()) {
-            if ( board[current.getY() + p[current.getRotation()].y + 1]
-                    [current.getX() + p[current.getRotation()].x] != Color.GRAY){
-                return true;
+    protected boolean canBeAdded() {
+        // sprawdzenie czy jest miejsce na nowy klocek
+        for (int i = (x / 2 - 2); i < (x / 2 + 2); i++) {
+            for (int j = 0; j < 4; j++)
+            if (board[j][i] != Color.GRAY) {
+                stop = true;
+                return false;
             }
         }
-        return false;
+        return true;
+    }
+
+
+    protected void fixBoard() {
+        //rozstawienie planszy
+        addCurrentBlockToTheBoard();
+        checkRows();
+
+        if(canBeAdded()){
+            generateNextBlock();
+        }
     }
 
     protected void addCurrentBlockToTheBoard() {
         // dodanie opadniętego klocka do planszy
-        for (Point[] p : current.getStructure()) {
-            board[current.getY() + p[current.getRotation()].y]
-                    [current.getX() + p[current.getRotation()].x] = current.getColor();
+        for (Point p : current.getStructure()[current.getRotation()]) {
+            board[current.getY() + p.y]
+                    [current.getX() + p.x] = current.getColor();
         }
 
         // zwiększenie wyniku
-        score += 100;
+        if(!stop){
+            score += 10;
+        }
     }
 
     protected void generateNextBlock() {
         // wygenerowanie nowego klocka
-        current = list.get(nextBlock);
+
+        int startPosition = x / 2 - 2;
+
+        switch (nextBlock) {
+            case 1:
+                current = new IBlock(startPosition, 0);
+                break;
+            case 2:
+                current = new JBlock(startPosition, 0);
+                break;
+            case 3:
+                current = new LBlock(startPosition, 0);
+                break;
+            case 4:
+                current = new TBlock(startPosition, 0);
+                break;
+            case 5:
+                current = new SBlock(startPosition, 0);
+                break;
+            case 6:
+                current = new ZBlock(startPosition, 0);
+                break;
+            default:
+                current = new OBlock(startPosition, 0);
+                break;
+        }
 
         Random random = new Random();
+        nextBlock = random.nextInt(7);
         nextBlock = random.nextInt(7);
     }
 

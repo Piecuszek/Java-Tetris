@@ -1,6 +1,4 @@
-package objects.blocks;
-
-import objects.Block;
+package blocks;
 
 import java.awt.*;
 
